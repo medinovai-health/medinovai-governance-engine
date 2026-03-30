@@ -1,7 +1,23 @@
-# Local stack: FastAPI governance API + Temporal + PostgreSQL + Temporal UI.
-# Internal API port 8000 (Python standard). Host DB mapped to 5433 to reduce collisions.
+# Local stack: governance PostgreSQL 15 + FastAPI + Temporal + UI.
+# Governance DB on host 5434; Temporal Postgres on 5433 (both PostgreSQL 15).
 
 services:
+  governance-postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: governance
+      POSTGRES_PASSWORD: governance
+      POSTGRES_DB: governance
+    ports:
+      - "5434:5432"
+    volumes:
+      - governance_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U governance"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   postgresql:
     image: postgres:15-alpine
     environment:
@@ -45,13 +61,23 @@ services:
       context: .
       dockerfile: Dockerfile
     depends_on:
-      - temporal
+      governance-postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_started
     environment:
+      DATABASE_URL: postgresql+asyncpg://governance:governance@governance-postgres:5432/governance
       TEMPORAL_ADDRESS: temporal:7233
       TEMPORAL_NAMESPACE: default
       EVIDENCE_STORE_URL: ""
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   governance-worker:
     build:
@@ -60,10 +86,17 @@ services:
     command: ["python", "temporal_worker.py"]
     working_dir: /app/src
     environment:
+      DATABASE_URL: postgresql+asyncpg://governance:governance@governance-postgres:5432/governance
       TEMPORAL_ADDRESS: temporal:7233
       TEMPORAL_NAMESPACE: default
     depends_on:
-      - temporal
+      governance-postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      governance-api:
+        condition: service_healthy
 
 volumes:
   temporal_pg_data:
+  governance_pg_data:

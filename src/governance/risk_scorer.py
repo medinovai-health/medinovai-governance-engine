@@ -7,6 +7,7 @@ from typing import Any
 
 import structlog
 
+from db.repository import AuditRepo
 from governance.constants import E_MODULE_ID
 
 mos_logger = structlog.get_logger()
@@ -39,6 +40,32 @@ class RiskScorer:
                 "includes_fine_geo": bool(mos_geo),
             },
         }
+
+    async def score_reidentification_risk_with_audit(
+        self,
+        mos_attributes: dict[str, Any],
+        mos_audit: AuditRepo,
+        *,
+        mos_tenantId: str,
+        mos_actorId: str,
+        mos_queryRequestId: str | None = None,
+    ) -> dict[str, Any]:
+        """Compute risk score and persist ``GovernanceAuditEvent`` (scores and bands only)."""
+        mos_result = self.score_reidentification_risk(mos_attributes)
+        mos_entity_id = mos_queryRequestId or "adhoc_risk_check"
+        await mos_audit.record(
+            mos_entityType="risk_assessment",
+            mos_entityId=mos_entity_id,
+            mos_action="risk_scored",
+            mos_actorId=mos_actorId,
+            mos_tenantId=mos_tenantId,
+            mos_details={
+                "score": mos_result["score"],
+                "band": mos_result["band"],
+                "factors": mos_result["factors"],
+            },
+        )
+        return mos_result
 
     @staticmethod
     def _band(mos_score: float) -> str:

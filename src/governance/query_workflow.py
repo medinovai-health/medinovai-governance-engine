@@ -1,4 +1,9 @@
-"""Temporal workflow for query approval (deterministic workflow code only)."""
+"""Temporal workflow for query approval (deterministic workflow code only).
+
+Persistence for ``QueryRequest`` / ``ApprovalRecord`` is performed in API routes and
+Temporal activities (``governance.query_activities``) using ``QueryRequestRepo`` and
+``ApprovalRepo`` — workflows must not import the database layer directly.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +13,8 @@ from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from governance.constants import E_QUERY_WORKFLOW_NAME
+
+E_ENSURE_QUERY_ACTIVITY_NAME = "ensure_query_request_activity"
 
 
 @workflow.defn(name=E_QUERY_WORKFLOW_NAME)
@@ -24,6 +31,11 @@ class QueryApprovalWorkflow:
         """Drive approval from submission to terminal state."""
         self._mos_required_sigs = int(mos_payload.get("signatures_required") or 1)
         mos_query_id = str(mos_payload.get("query_id", ""))
+        await workflow.execute_activity(
+            E_ENSURE_QUERY_ACTIVITY_NAME,
+            mos_query_id,
+            start_to_close_timeout=timedelta(seconds=60),
+        )
         await workflow.wait_condition(
             lambda: self._mos_decision is not None,
             timeout=timedelta(days=30),

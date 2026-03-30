@@ -14,12 +14,16 @@ mos_logger = structlog.get_logger()
 class PolicyEngine:
     """Enforce minimum cell size, cross-dataset linkage, and policy bundles."""
 
-    def __init__(self, mos_minCellSize: int | None = None) -> None:
+    def __init__(
+        self,
+        mos_policies: dict[str, dict[str, Any]] | None = None,
+        mos_minCellSize: int | None = None,
+    ) -> None:
         self._mos_min_cell = mos_minCellSize or E_DEFAULT_MIN_CELL_SIZE
-        self._mos_policies: dict[str, dict[str, Any]] = {}
+        self._mos_policies: dict[str, dict[str, Any]] = dict(mos_policies or {})
 
     def register_policy(self, mos_policyId: str, mos_definition: dict[str, Any]) -> None:
-        """Register or replace a named policy bundle."""
+        """Register or replace a named policy bundle (in-process; prefer DB via routes)."""
         self._mos_policies[mos_policyId] = mos_definition
         mos_logger.info(
             "policy_registered",
@@ -30,7 +34,7 @@ class PolicyEngine:
         )
 
     def list_policies(self) -> list[dict[str, Any]]:
-        """Return metadata for all policies."""
+        """Return metadata for all policies loaded in this engine instance."""
         return [{"id": mos_k, **mos_v} for mos_k, mos_v in self._mos_policies.items()]
 
     def check_minimum_cell_size(self, mos_cellCount: int) -> dict[str, Any]:

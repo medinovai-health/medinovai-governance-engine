@@ -1,25 +1,22 @@
-"""Data Use Agreement parsing, validation, and compliance checks."""
+"""Data Use Agreement parsing, validation, and compliance checks (PostgreSQL-backed)."""
 
 from __future__ import annotations
 
-import hashlib
 import json
 from datetime import datetime, timezone
 from typing import Any
-from uuid import uuid4
 
 import structlog
 
+from db.models import DataUseAgreement, E_DuaStatus
+from db.repository import DUARepo
 from governance.constants import E_MODULE_ID
 
 mos_logger = structlog.get_logger()
 
 
 class DuaManager:
-    """Parse DUA payloads, validate schema, enforce term and purpose rules."""
-
-    def __init__(self) -> None:
-        self._mos_store: dict[str, dict[str, Any]] = {}
+    """Parse DUA payloads, validate schema, enforce term and purpose rules via ``DUARepo``."""
 
     def parse_dua_payload(self, mos_rawBody: bytes) -> dict[str, Any]:
         """Parse JSON DUA body; raises ValueError on invalid JSON."""
@@ -49,50 +46,59 @@ class DuaManager:
             mos_errors.append("permitted_purposes_not_list")
         return mos_errors
 
-    def check_term_compliance(
+    async def check_term_compliance(
         self,
+        mos_repo: DUARepo,
         mos_duaId: str,
         mos_at: datetime | None = None,
     ) -> dict[str, Any]:
         """Evaluate expiration and revocation for a stored DUA."""
         mos_now = mos_at or datetime.now(timezone.utc)
-        mos_rec = self._mos_store.get(mos_duaId)
+        mos_rec = await mos_repo.get_by_id_str(mos_duaId)
         if not mos_rec:
             return {"compliant": False, "reason": "dua_not_found"}
-        if mos_rec.get("revoked"):
+        if mos_rec.status == E_DuaStatus.REVOKED:
             return {"compliant": False, "reason": "dua_revoked"}
-        mos_expires = mos_rec.get("expires_at")
-        if mos_expires:
-            mos_exp_dt = datetime.fromisoformat(mos_expires.replace("Z", "+00:00"))
-            if mos_now > mos_exp_dt:
-                return {"compliant": False, "reason": "dua_expired"}
+        if mos_rec.status == E_DuaStatus.SUSPENDED:
+            return {"compliant": False, "reason": "dua_suspended"}
+        if mos_rec.end_date and mos_now > mos_rec.end_date:
+            return {"compliant": False, "reason": "dua_expired"}
+        if mos_rec.status not in (E_DuaStatus.ACTIVE,):
+            return {"compliant": False, "reason": "dua_not_active"}
         return {"compliant": True, "reason": "ok"}
 
-    def purpose_allowed(
+    async def purpose_allowed(
         self,
+        mos_repo: DUARepo,
         mos_duaId: str,
         mos_statedPurpose: str,
     ) -> dict[str, Any]:
-        """Purpose-based access control against permitted_purposes."""
-        mos_rec = self._mos_store.get(mos_duaId)
+        """Purpose-based access control against approved uses."""
+        mos_rec = await mos_repo.get_by_id_str(mos_duaId)
         if not mos_rec:
             return {"allowed": False, "reason": "dua_not_found"}
-        mos_allowed = set(mos_rec.get("permitted_purposes") or [])
+        mos_allowed = {str(mos_x) for mos_x in (mos_rec.approved_uses or [])}
         mos_ok = mos_statedPurpose in mos_allowed
         return {
             "allowed": mos_ok,
             "reason": "purpose_ok" if mos_ok else "purpose_denied",
         }
 
-    def store_dua(self, mos_dua: dict[str, Any]) -> str:
-        """Persist in-memory stub; returns DUA id."""
-        mos_id = str(mos_dua.get("id") or uuid4())
-        mos_copy = dict(mos_dua)
-        mos_copy["id"] = mos_id
-        mos_copy["content_hash"] = hashlib.sha256(
-            json.dumps(mos_copy, sort_keys=True).encode()
-        ).hexdigest()
-        self._mos_store[mos_id] = mos_copy
+    async def store_dua(
+        self,
+        mos_repo: DUARepo,
+        mos_dua: dict[str, Any],
+        *,
+        mos_tenantId: str,
+        mos_actorId: str,
+    ) -> str:
+        """Persist via ``DUARepo``; returns DUA id (audit on create)."""
+        mos_row = await mos_repo.create_from_payload(
+            mos_dua,
+            mos_tenantId=mos_tenantId,
+            mos_actorId=mos_actorId,
+        )
+        mos_id = str(mos_row.id)
         mos_logger.info(
             "dua_stored",
             module_id=E_MODULE_ID,
@@ -102,6 +108,30 @@ class DuaManager:
         )
         return mos_id
 
-    def get_dua(self, mos_duaId: str) -> dict[str, Any] | None:
-        """Return stored DUA or None."""
-        return self._mos_store.get(mos_duaId)
+    async def get_dua(self, mos_repo: DUARepo, mos_duaId: str) -> dict[str, Any] | None:
+        """Return stored DUA as API-shaped dict or None."""
+        mos_rec = await mos_repo.get_by_id_str(mos_duaId)
+        if not mos_rec:
+            return None
+        return _dua_to_dict(mos_rec)
+
+
+def _dua_to_dict(mos_row: DataUseAgreement) -> dict[str, Any]:
+    """Map ORM row to JSON-friendly dict (IDs only)."""
+    return {
+        "id": str(mos_row.id),
+        "title": mos_row.title,
+        "institution": mos_row.institution,
+        "principal_investigator": mos_row.principal_investigator,
+        "purpose": mos_row.purpose,
+        "data_categories": mos_row.data_categories,
+        "approved_uses": mos_row.approved_uses,
+        "restrictions": mos_row.restrictions,
+        "start_date": mos_row.start_date.isoformat(),
+        "end_date": mos_row.end_date.isoformat() if mos_row.end_date else None,
+        "status": mos_row.status.value,
+        "tenant_id": mos_row.tenant_id,
+        "created_by": mos_row.created_by,
+        "created_at": mos_row.created_at.isoformat() if mos_row.created_at else None,
+        "updated_at": mos_row.updated_at.isoformat() if mos_row.updated_at else None,
+    }

@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from api import deps
+from db.repository import AuditRepo, DUARepo
+from governance.constants import E_DEFAULT_TENANT_ID, E_SYSTEM_ACTOR_ID
 from governance.dua_manager import DuaManager
 
 router = APIRouter(prefix="/api/v1/dua", tags=["dua"])
@@ -29,6 +33,9 @@ def _get_manager() -> DuaManager:
 async def dua_upload(
     mos_file: UploadFile | None = File(None),
     mos_manager: DuaManager = Depends(_get_manager),
+    mos_session: AsyncSession = Depends(deps.get_db_session),
+    mos_x_tenant_id: str | None = Header(default=None, alias="X-Tenant-ID"),
+    mos_x_actor_id: str | None = Header(default=None, alias="X-Actor-ID"),
 ) -> dict[str, Any]:
     """Upload DUA document (JSON file) or use JSON APIs in production gateway."""
     if not mos_file:
@@ -38,7 +45,14 @@ async def dua_upload(
     mos_errors = mos_manager.validate_dua_structure(mos_parsed)
     if mos_errors:
         raise HTTPException(status_code=422, detail={"errors": mos_errors})
-    mos_id = mos_manager.store_dua(mos_parsed)
+    mos_audit = AuditRepo(mos_session)
+    mos_repo = DUARepo(mos_session, mos_audit)
+    mos_id = await mos_manager.store_dua(
+        mos_repo,
+        mos_parsed,
+        mos_tenantId=mos_x_tenant_id or mos_parsed.get("tenant_id") or E_DEFAULT_TENANT_ID,
+        mos_actorId=mos_x_actor_id or mos_parsed.get("created_by") or E_SYSTEM_ACTOR_ID,
+    )
     return {"id": mos_id, "status": "stored"}
 
 
@@ -56,16 +70,27 @@ async def dua_validate(
 async def dua_check_compliance(
     mos_body: DuaComplianceBody,
     mos_manager: DuaManager = Depends(_get_manager),
+    mos_session: AsyncSession = Depends(deps.get_db_session),
 ) -> dict[str, Any]:
     """Check term + purpose compliance for a stored DUA."""
-    from datetime import datetime, timezone
-
     mos_at = None
     if mos_body.at:
         mos_at = datetime.fromisoformat(mos_body.at.replace("Z", "+00:00"))
-    mos_term = mos_manager.check_term_compliance(mos_body.dua_id, mos_at)
-    mos_purpose = mos_manager.purpose_allowed(mos_body.dua_id, mos_body.stated_purpose)
+    mos_audit = AuditRepo(mos_session)
+    mos_repo = DUARepo(mos_session, mos_audit)
+    mos_term = await mos_manager.check_term_compliance(mos_repo, mos_body.dua_id, mos_at)
+    mos_purpose = await mos_manager.purpose_allowed(
+        mos_repo, mos_body.dua_id, mos_body.stated_purpose
+    )
     mos_compliant = mos_term.get("compliant") and mos_purpose.get("allowed")
+    await mos_audit.record(
+        mos_entityType="data_use_agreement",
+        mos_entityId=mos_body.dua_id,
+        mos_action="compliance_checked",
+        mos_actorId=E_SYSTEM_ACTOR_ID,
+        mos_tenantId=E_DEFAULT_TENANT_ID,
+        mos_details={"compliant": mos_compliant},
+    )
     return {
         "compliant": mos_compliant,
         "term": mos_term,

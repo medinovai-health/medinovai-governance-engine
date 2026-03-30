@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import os
-from typing import Any
-
 import structlog
 from temporalio.client import Client
 
@@ -18,7 +16,8 @@ async def mos_connect_temporal() -> Client | None:
     """Connect to Temporal or return None if unavailable."""
     mos_address = os.environ.get("TEMPORAL_ADDRESS", "localhost:7233")
     try:
-        mos_client = await Client.connect(mos_address, namespace=os.environ.get("TEMPORAL_NAMESPACE", "default"))
+        mos_ns = os.environ.get("TEMPORAL_NAMESPACE", "default")
+        mos_client = await Client.connect(mos_address, namespace=mos_ns)
         return mos_client
     except Exception as mos_exc:
         mos_logger.warning(
@@ -46,15 +45,20 @@ async def mos_start_query_workflow(mos_queryId: str, mos_signaturesRequired: int
     return "temporal_started"
 
 
-async def mos_signal_query_workflow(mos_queryId: str, mos_signal: str, mos_actorId: str | None) -> None:
+async def mos_signal_query_workflow(
+    mos_queryId: str,
+    mos_signal: str,
+    mos_actorId: str | None,
+) -> None:
     """Send signal to running workflow."""
     mos_client = await mos_connect_temporal()
     if not mos_client:
         return
-    mos_handle = mos_client.get_workflow_handle(f"query-approval-{mos_queryId}")
+    mos_wid = f"query-approval-{mos_queryId}"
+    mos_handle = mos_client.get_workflow_handle(mos_wid)
     if mos_signal == "sign" and mos_actorId:
-        await mos_handle.signal(QueryApprovalWorkflow.sign, mos_actorId)
+        await mos_handle.signal(QueryApprovalWorkflow.submit_signature, mos_actorId)
     elif mos_signal == "finalize_approve":
-        await mos_handle.signal(QueryApprovalWorkflow.finalize_approve)
+        await mos_handle.signal(QueryApprovalWorkflow.approve)
     elif mos_signal == "deny":
         await mos_handle.signal(QueryApprovalWorkflow.deny)
