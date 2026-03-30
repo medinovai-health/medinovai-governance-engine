@@ -1,0 +1,69 @@
+# Local stack: FastAPI governance API + Temporal + PostgreSQL + Temporal UI.
+# Internal API port 8000 (Python standard). Host DB mapped to 5433 to reduce collisions.
+
+services:
+  postgresql:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_USER: temporal
+    ports:
+      - "5433:5432"
+    volumes:
+      - temporal_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  temporal:
+    image: temporalio/auto-setup:1.24.2
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=postgresql
+    ports:
+      - "7233:7233"
+
+  temporal-ui:
+    image: temporalio/ui:2.31.2
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    ports:
+      - "8088:8080"
+
+  governance-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: default
+      EVIDENCE_STORE_URL: ""
+    ports:
+      - "8000:8000"
+
+  governance-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "temporal_worker.py"]
+    working_dir: /app/src
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: default
+    depends_on:
+      - temporal
+
+volumes:
+  temporal_pg_data:

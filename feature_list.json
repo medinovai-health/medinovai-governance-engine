@@ -1,0 +1,1152 @@
+{
+  "repo": "medinovai-governance-engine",
+  "tier": 1,
+  "generated": "2026-03-30T17:31:50.166626Z",
+  "last_updated": "2026-03-30T17:32:00.843750Z",
+  "total": 55,
+  "completed": 0,
+  "features": [
+    {
+      "id": "F001",
+      "category": "functional",
+      "priority": "P1",
+      "description": "Parse uploaded DUA JSON and reject malformed payloads",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-DUA-001"
+      ],
+      "steps": [
+        "Upload invalid JSON to /api/v1/dua/upload",
+        "Assert 422 or 400",
+        "Assert no DUA id returned",
+        "Assert audit stub logs parse failure category"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F002",
+      "category": "functional",
+      "priority": "P1",
+      "description": "Validate required DUA fields: dataset_id, permitted_purposes, effective_from",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-DUA-002"
+      ],
+      "steps": [
+        "POST /api/v1/dua/validate with missing dataset_id",
+        "Assert valid=false and errors contains missing_dataset_id",
+        "POST with full fields",
+        "Assert valid=true"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F003",
+      "category": "functional",
+      "priority": "P1",
+      "description": "Store DUA and return stable identifier",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-DUA-003"
+      ],
+      "steps": [
+        "Upload valid DUA JSON",
+        "Assert 200 and id in response",
+        "GET compliance check uses returned id",
+        "Assert term compliance ok"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F004",
+      "category": "compliance",
+      "priority": "P1",
+      "description": "Enforce DUA expiration on compliance check",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-DUA-004"
+      ],
+      "steps": [
+        "Store DUA with expires_at in the past",
+        "POST /api/v1/dua/check-compliance",
+        "Assert compliant=false and reason dua_expired",
+        "Assert audit event concept documented in AUDIT_TRAIL"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F005",
+      "category": "compliance",
+      "priority": "P1",
+      "description": "Block access when DUA revoked",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-DUA-005"
+      ],
+      "steps": [
+        "Mark DUA revoked in store",
+        "POST check-compliance",
+        "Assert compliant=false",
+        "Assert reason dua_revoked"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F006",
+      "category": "security",
+      "priority": "P1",
+      "description": "Purpose-based access denies unknown purpose codes",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-DUA-006"
+      ],
+      "steps": [
+        "Store DUA with purposes [research]",
+        "POST check with stated_purpose analytics",
+        "Assert purpose allowed=false"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F007",
+      "category": "functional",
+      "priority": "P2",
+      "description": "List permitted purposes for a DUA in API response extension",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-DUA-007"
+      ],
+      "steps": [
+        "Define DUA with multiple purposes",
+        "Expose read endpoint in future /dua/{id}",
+        "Assert purposes echoed",
+        "Document in OpenAPI"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F008",
+      "category": "compliance",
+      "priority": "P1",
+      "description": "DUA content hash recorded for integrity",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-DUA-008"
+      ],
+      "steps": [
+        "Upload DUA",
+        "Read internal record shows content_hash",
+        "Mutate locally in test",
+        "Assert hash mismatch detectable"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F009",
+      "category": "functional",
+      "priority": "P2",
+      "description": "Support DUA renewal effective date updates",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-DUA-009"
+      ],
+      "steps": [
+        "Submit renewal payload",
+        "Assert effective_from updated",
+        "Assert audit trail entry"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F010",
+      "category": "security",
+      "priority": "P1",
+      "description": "Reject DUA upload when file empty",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-DUA-010"
+      ],
+      "steps": [
+        "POST upload without file",
+        "Assert 400 file_required"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F011",
+      "category": "compliance",
+      "priority": "P2",
+      "description": "Map DUA clauses to policy engine rules",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-DUA-011"
+      ],
+      "steps": [
+        "Register policy linked to dua_id",
+        "Run governance check-compliance",
+        "Assert policy association"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F012",
+      "category": "functional",
+      "priority": "P2",
+      "description": "Normalize purpose codes to controlled vocabulary",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-DUA-012"
+      ],
+      "steps": [
+        "Send mixed-case purpose",
+        "Assert normalization or validation error",
+        "Document vocabulary"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F013",
+      "category": "functional",
+      "priority": "P1",
+      "description": "Submit query returns id and pending_review",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-QRY-001"
+      ],
+      "steps": [
+        "POST /api/v1/query/submit",
+        "Assert id and status pending_review",
+        "Assert workflow_status local_only or temporal_started"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F014",
+      "category": "functional",
+      "priority": "P1",
+      "description": "List queries returns submitted item",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-QRY-002"
+      ],
+      "steps": [
+        "Submit query",
+        "GET /api/v1/query/list",
+        "Assert item present",
+        "Assert no PHI fields in JSON"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F015",
+      "category": "functional",
+      "priority": "P1",
+      "description": "Approve query records actor and timestamp",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-QRY-003"
+      ],
+      "steps": [
+        "Submit then POST approve with actor_id",
+        "Assert status approved",
+        "Assert decided_at set",
+        "Assert evidence signature stub called"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F016",
+      "category": "functional",
+      "priority": "P1",
+      "description": "Deny query records reason_code",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-QRY-004"
+      ],
+      "steps": [
+        "Submit then POST deny",
+        "Assert status denied",
+        "Assert denial_reason stored"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F017",
+      "category": "compliance",
+      "priority": "P1",
+      "description": "Sensitive queries require multiple signatures per config",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-QRY-005"
+      ],
+      "steps": [
+        "Submit sensitivity_tier sensitive",
+        "Assert signatures_required equals E_DEFAULT_SENSITIVE_SIGNATURES_REQUIRED",
+        "Document in CLAUDE.md"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F018",
+      "category": "functional",
+      "priority": "P2",
+      "description": "Temporal workflow starts on successful cluster connect",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-QRY-006"
+      ],
+      "steps": [
+        "With Temporal up",
+        "Submit query",
+        "Assert workflow_status temporal_started",
+        "Verify workflow visible in UI"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F019",
+      "category": "functional",
+      "priority": "P2",
+      "description": "Signal workflow on approve path",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-QRY-007"
+      ],
+      "steps": [
+        "Temporal running",
+        "Submit",
+        "Approve via API",
+        "Assert workflow completes approved"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F020",
+      "category": "security",
+      "priority": "P1",
+      "description": "404 on approve for unknown query id",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-QRY-008"
+      ],
+      "steps": [
+        "POST approve random uuid",
+        "Assert 404 query_not_found"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F021",
+      "category": "compliance",
+      "priority": "P1",
+      "description": "Audit events for submit, approve, deny",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-QRY-009"
+      ],
+      "steps": [
+        "Drive full lifecycle",
+        "Assert three audit event types in Evidence Store or stub logs",
+        "Verify phi_safe logging"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F022",
+      "category": "performance",
+      "priority": "P3",
+      "description": "Submit endpoint p95 under 500ms without Temporal",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11"
+      ],
+      "requirements": [
+        "REQ-QRY-010"
+      ],
+      "steps": [
+        "Load test 100 submits",
+        "Measure p95",
+        "Assert threshold"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F023",
+      "category": "functional",
+      "priority": "P2",
+      "description": "Query spec opaque blob not logged in clear text",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-QRY-011"
+      ],
+      "steps": [
+        "Submit with spec",
+        "grep logs for spec content",
+        "Assert absent"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F024",
+      "category": "security",
+      "priority": "P2",
+      "description": "Rate limit submit per researcher id",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-QRY-012"
+      ],
+      "steps": [
+        "Define gateway limit",
+        "Burst requests",
+        "Assert 429",
+        "Document in deployment"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F025",
+      "category": "functional",
+      "priority": "P2",
+      "description": "Queue position or priority in list response",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-QRY-013"
+      ],
+      "steps": [
+        "Submit multiple",
+        "GET list",
+        "Assert ordering policy documented"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F026",
+      "category": "compliance",
+      "priority": "P1",
+      "description": "Electronic signature meaning captured on approval",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-QRY-014"
+      ],
+      "steps": [
+        "Approve",
+        "Assert Evidence Store request includes meaning query_approval",
+        "Map to 21 CFR Part 11"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F027",
+      "category": "functional",
+      "priority": "P1",
+      "description": "Register policy via POST /api/v1/governance/policies",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-GOV-001"
+      ],
+      "steps": [
+        "POST policy",
+        "GET list",
+        "Assert policy present"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F028",
+      "category": "functional",
+      "priority": "P1",
+      "description": "Minimum cell size check fails small counts",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-GOV-002"
+      ],
+      "steps": [
+        "POST check-compliance cell_count=2",
+        "Assert passes=false"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F029",
+      "category": "functional",
+      "priority": "P1",
+      "description": "Minimum cell size passes at threshold",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-GOV-003"
+      ],
+      "steps": [
+        "POST cell_count=5",
+        "Assert passes=true"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F030",
+      "category": "functional",
+      "priority": "P1",
+      "description": "Linkage blocked pairs enforced",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-GOV-004"
+      ],
+      "steps": [
+        "Register blocked_linkage_pairs",
+        "Evaluate linkage",
+        "Assert allowed=false"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F031",
+      "category": "functional",
+      "priority": "P2",
+      "description": "Risk scorer returns band low for benign attributes",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-GOV-005"
+      ],
+      "steps": [
+        "POST risk_attributes minimal",
+        "Assert band low"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F032",
+      "category": "functional",
+      "priority": "P2",
+      "description": "Risk scorer escalates with fine geo flag",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-GOV-006"
+      ],
+      "steps": [
+        "includes_fine_geo true",
+        "Assert band not low"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F033",
+      "category": "compliance",
+      "priority": "P1",
+      "description": "Policy evaluation aggregates multiple policy ids",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-GOV-007"
+      ],
+      "steps": [
+        "Pass two policy ids",
+        "Assert policies_checked length 2"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F034",
+      "category": "security",
+      "priority": "P2",
+      "description": "Tenant isolation on policy registry",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-GOV-008"
+      ],
+      "steps": [
+        "Pass tenant header",
+        "Assert policies scoped",
+        "Document MSS/SpiceDB integration"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F035",
+      "category": "functional",
+      "priority": "P3",
+      "description": "Hot reload policy definitions from config service",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-GOV-009"
+      ],
+      "steps": [
+        "Mock config webhook",
+        "Reload",
+        "Assert updated rule"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F036",
+      "category": "performance",
+      "priority": "P3",
+      "description": "check-compliance completes under 200ms",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11"
+      ],
+      "requirements": [
+        "REQ-GOV-010"
+      ],
+      "steps": [
+        "Benchmark endpoint",
+        "Assert p95"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F037",
+      "category": "compliance",
+      "priority": "P1",
+      "description": "IEC 62304 traceability from feature to requirement id",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-GOV-011"
+      ],
+      "steps": [
+        "Verify feature_list requirements present",
+        "Link to spec YAML"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F038",
+      "category": "functional",
+      "priority": "P2",
+      "description": "Export policy bundle as signed artifact",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-GOV-012"
+      ],
+      "steps": [
+        "Call future export",
+        "Assert signature",
+        "Store lineage"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F039",
+      "category": "functional",
+      "priority": "P1",
+      "description": "Evidence Store stub returns signature_id offline",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-EVD-001"
+      ],
+      "steps": [
+        "Call request_electronic_signature without URL",
+        "Assert stub status",
+        "Assert UUID present"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F040",
+      "category": "functional",
+      "priority": "P1",
+      "description": "Connector stub execute returns governance keys",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-CON-001"
+      ],
+      "steps": [
+        "Get stub connector",
+        "execute with spec",
+        "Assert governance_keys"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F041",
+      "category": "functional",
+      "priority": "P2",
+      "description": "Lineage recorded after approval",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-EVD-002"
+      ],
+      "steps": [
+        "Approve query",
+        "Call record_lineage",
+        "Assert lineage_id"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F042",
+      "category": "compliance",
+      "priority": "P1",
+      "description": "Audit append includes module_id and event_type",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-EVD-003"
+      ],
+      "steps": [
+        "append_audit_event",
+        "Assert structured fields",
+        "No raw PHI"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F043",
+      "category": "security",
+      "priority": "P2",
+      "description": "Evidence Store mTLS in production",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-EVD-004"
+      ],
+      "steps": [
+        "Document TLS 1.3",
+        "Client cert env vars",
+        "Integration test in staging"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F044",
+      "category": "functional",
+      "priority": "P2",
+      "description": "Temporal worker registers activities",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-TMP-001"
+      ],
+      "steps": [
+        "Start worker",
+        "Poll metrics",
+        "Assert task queue"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F045",
+      "category": "functional",
+      "priority": "P2",
+      "description": "Health and ready return 200 for k8s probes",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-OPS-001"
+      ],
+      "steps": [
+        "GET /health",
+        "GET /ready",
+        "Assert 200 JSON"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F046",
+      "category": "compliance",
+      "priority": "P1",
+      "description": "AUDIT_TRAIL.md maps events to CFR controls",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-OPS-002"
+      ],
+      "steps": [
+        "Review AUDIT_TRAIL",
+        "Crosswalk to Part 11",
+        "Sign-off checklist"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F047",
+      "category": "security",
+      "priority": "P1",
+      "description": "JWT validation on mutating routes via gateway",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-SEC-001"
+      ],
+      "steps": [
+        "Document MSS",
+        "Integration test with mock JWT",
+        "Assert 401 without token"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F048",
+      "category": "compliance",
+      "priority": "P1",
+      "description": "HIPAA minimum necessary on query responses",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-SEC-002"
+      ],
+      "steps": [
+        "Review response schemas",
+        "Assert IDs not PHI"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F049",
+      "category": "functional",
+      "priority": "P2",
+      "description": "OpenAPI published at /docs",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11",
+        "ISO13485",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-API-001"
+      ],
+      "steps": [
+        "GET /docs",
+        "Assert 200",
+        "Export schema"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F050",
+      "category": "performance",
+      "priority": "P3",
+      "description": "Docker compose brings up Temporal and API",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11"
+      ],
+      "requirements": [
+        "REQ-DEV-001"
+      ],
+      "steps": [
+        "docker compose up",
+        "curl health",
+        "Assert temporal-ui reachable"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F051",
+      "category": "compliance",
+      "priority": "P1",
+      "description": "Consent cascade propagates DUA revocation to pending queries",
+      "regulatory": [
+        "HIPAA",
+        "GDPR"
+      ],
+      "requirements": [
+        "REQ-CSC-001"
+      ],
+      "steps": [
+        "Revoke DUA",
+        "List pending queries for that dua_id",
+        "Assert auto-denied or flagged",
+        "Audit event emitted"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F052",
+      "category": "security",
+      "priority": "P1",
+      "description": "SpiceDB permission check before approve API",
+      "regulatory": [
+        "HIPAA",
+        "21CFR11"
+      ],
+      "requirements": [
+        "REQ-RBAC-001"
+      ],
+      "steps": [
+        "Mock SpiceDB allow",
+        "POST approve",
+        "Assert 200",
+        "Mock deny",
+        "Assert 403"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F053",
+      "category": "functional",
+      "priority": "P2",
+      "description": "Datavant cross-dataset token policy gate on execution connector",
+      "regulatory": [
+        "HIPAA"
+      ],
+      "requirements": [
+        "REQ-DVT-001"
+      ],
+      "steps": [
+        "Configure token policy id on query",
+        "Execute connector",
+        "Assert policy enforced or stub"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F054",
+      "category": "compliance",
+      "priority": "P1",
+      "description": "Immutable WORM storage handoff for audit events",
+      "regulatory": [
+        "21CFR11",
+        "ISO13485"
+      ],
+      "requirements": [
+        "REQ-WORM-001"
+      ],
+      "steps": [
+        "Emit audit",
+        "Verify Evidence Store endpoint",
+        "Assert retention class"
+      ],
+      "passes": false
+    },
+    {
+      "id": "F055",
+      "category": "functional",
+      "priority": "P2",
+      "description": "Artifact lineage links DUA version, policy version, and query id",
+      "regulatory": [
+        "21CFR11"
+      ],
+      "requirements": [
+        "REQ-LIN-001"
+      ],
+      "steps": [
+        "Approve query",
+        "POST lineage with versions",
+        "Assert graph retrievable"
+      ],
+      "passes": false
+    }
+  ]
+}

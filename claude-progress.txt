@@ -1,0 +1,21 @@
+=== MedinovAI Harness 2.1 — Progress Log ===
+Repo: medinovai-governance-engine
+Tier: 1
+Initialized: 2026-03-30
+Total Features: 55
+Features Completed: 0
+Features Remaining: 55
+
+--- SESSION 0 (Initializer) ---
+Date: 2026-03-30T00:00:00Z
+Model: composer-agent
+Actions:
+  - CLAUDE.md written (Harness §9 + Tier 1 annotations)
+  - init.sh written (Python/FastAPI + Temporal smoke imports)
+  - feature_list.json written (55 features, F001–F055)
+  - AUDIT_TRAIL.md written (21 CFR Part 11 format)
+  - .claude/settings.json + commands/ added (strict permissions)
+  - src/api (health, dua, query, governance routes), src/governance, src/integration
+  - Dockerfile + docker-compose.yml (Temporal + Postgres + UI + API + worker)
+Status: COMPLETE
+Next Session: Pick F001 — Parse uploaded DUA JSON and reject malformed payloads
